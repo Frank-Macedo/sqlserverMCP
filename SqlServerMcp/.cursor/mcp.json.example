@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "sqlserver": {
+      "command": "c:\\Projetos\\SqlServerMcp\\SqlServerMcp\\bin\\Release\\net9.0\\SqlServerMcp.exe",
+      "args": [],
+      "env": {
+        "SQLSERVER_CONNECTION_STRING": "Server=localhost,1433;Database=MinhaDatabase;User Id=sa;Password=YOUR_PASSWORD;TrustServerCertificate=True",
+        "SQLSERVER_COMMAND_TIMEOUT_SECONDS": "30",
+        "SQLSERVER_MAX_SAMPLE_ROWS": "100",
+        "SQLSERVER_MAX_SELECT_ROWS": "100",
+        "SQLSERVER_MAX_RESULT_SIZE_BYTES": "524288"
+      }
+    }
+  }
+}

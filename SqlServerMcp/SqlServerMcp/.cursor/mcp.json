@@ -1,0 +1,12 @@
+{
+    "mcpServers": {
+      "sqlserver": {
+        "command": "c:\\Projetos\\SqlServerMcp\\SqlServerMcp\\bin\\Release\\net9.0\\SqlServerMcp.exe",
+        "args": [],
+        "env": {
+          "SQLSERVER_CONNECTION_STRING": "Data Source=192.168.15.22;Initial Catalog=KAIROS-BASE-39168985827;Persist Security Info=True;User ID=newPoint;Password=homologacao;Max Pool Size=500;TrustServerCertificate=True",
+          "SQLSERVER_COMMAND_TIMEOUT_SECONDS": "30"
+        }
+      }
+    }
+  }

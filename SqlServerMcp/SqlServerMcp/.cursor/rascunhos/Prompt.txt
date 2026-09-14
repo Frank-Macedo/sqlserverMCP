@@ -1,0 +1,586 @@
+# Criar MCP Read-Only para análise de SQL Server
+
+Quero criar um servidor MCP em **C#/.NET** para permitir que o **Cursor** consulte um SQL Server durante o planejamento e análise de tarefas de desenvolvimento.
+
+O objetivo NÃO é permitir que o Cursor altere o banco de dados.
+
+O MCP deverá ser **100% read-only**, permitindo apenas consultas de análise e exploração do banco.
+
+## Objetivo
+
+Quero conseguir pedir ao Cursor coisas como:
+
+* "Analise como a tabela PESSOA é utilizada."
+* "Quais tabelas possuem relação com EMPRESA?"
+* "Encontre onde existe a coluna RAIO_MARCACAO."
+* "Analise alguns registros da tabela PESSOA."
+* "Quantos registros existem nessa tabela?"
+* "Quais são os valores possíveis desse campo?"
+* "Antes de planejar essa alteração, analise os dados atuais no banco."
+* "Verifique se existem registros que podem ser afetados por essa alteração."
+
+O Cursor deverá conseguir explorar o banco, entender seu schema e analisar dados reais antes de elaborar um plano de implementação.
+
+---
+
+# Arquitetura desejada
+
+A arquitetura deve ser:
+
+Cursor
+|
+| MCP / STDIO
+v
+SQL Server MCP
+|
+| Microsoft.Data.SqlClient
+v
+SQL Server
+
+O MCP será executado localmente no Windows e o Cursor será responsável por iniciar o processo MCP.
+
+Inicialmente NÃO quero HTTP, Docker ou servidor remoto.
+
+Utilize **STDIO**.
+
+---
+
+# Tecnologias
+
+Utilizar:
+
+* C#
+* .NET
+* ModelContextProtocol SDK oficial para C#
+* Microsoft.Data.SqlClient
+* Windows
+* SQL Server
+* MCP via STDIO
+
+Não introduza frameworks desnecessários.
+
+---
+
+# Desenvolvimento em fases
+
+Implemente o projeto seguindo obrigatoriamente estas fases.
+
+NÃO pule fases.
+
+Ao terminar cada fase:
+
+1. compile o projeto;
+2. execute os testes necessários;
+3. explique o que foi implementado;
+4. mostre os arquivos alterados;
+5. informe como validar a fase;
+6. aguarde minha confirmação antes de iniciar a próxima fase.
+
+Não implemente todas as fases de uma vez.
+
+---
+
+# FASE 1 — Criar o projeto MCP
+
+Criar um projeto console .NET chamado:
+
+SqlServerMcp
+
+Estrutura inicial:
+
+SqlServerMcp/
+├── Program.cs
+├── SqlServerMcp.csproj
+└── README.md
+
+Adicionar o pacote oficial:
+
+ModelContextProtocol
+
+Configurar o servidor MCP usando:
+
+* AddMcpServer()
+* WithStdioServerTransport()
+* WithToolsFromAssembly()
+
+Criar uma ferramenta simples de teste:
+
+test_connection
+
+Ela inicialmente não precisa acessar o SQL Server.
+
+Deve apenas retornar algo indicando que o MCP está funcionando.
+
+Objetivo da fase:
+
+Cursor -> MCP -> test_connection
+
+---
+
+# FASE 2 — Configuração do SQL Server
+
+Adicionar:
+
+Microsoft.Data.SqlClient
+
+Não colocar senha ou connection string diretamente no código.
+
+Utilizar variável de ambiente:
+
+SQLSERVER_CONNECTION_STRING
+
+Criar uma classe responsável pela conexão, por exemplo:
+
+Services/SqlServerService.cs
+
+Essa classe deverá:
+
+* abrir conexão;
+* executar comandos;
+* fechar/liberar conexão corretamente;
+* utilizar async/await;
+* possuir timeout configurável;
+* tratar erros de conexão de forma clara.
+
+A connection string deverá ser lida através de variável de ambiente.
+
+Exemplo:
+
+SQLSERVER_CONNECTION_STRING="Server=localhost,1433;Database=MinhaDatabase;User Id=sa;Password=...;TrustServerCertificate=True"
+
+Não armazenar credenciais no Git.
+
+---
+
+# FASE 3 — Segurança Read-Only
+
+Antes de permitir consultas arbitrárias, criar um mecanismo de validação.
+
+O MCP deve impedir qualquer operação que possa modificar o banco.
+
+Bloquear:
+
+INSERT
+UPDATE
+DELETE
+MERGE
+DROP
+ALTER
+TRUNCATE
+CREATE
+EXEC
+EXECUTE
+GRANT
+REVOKE
+DENY
+
+Também bloquear múltiplas instruções quando isso puder permitir uma operação perigosa.
+
+O objetivo é que o MCP aceite somente consultas de leitura.
+
+Exemplos permitidos:
+
+SELECT
+WITH ... SELECT
+
+Exemplos proibidos:
+
+DELETE FROM PESSOA
+
+UPDATE PESSOA SET ...
+
+DROP TABLE PESSOA
+
+EXEC sp_...
+
+Criar uma classe separada:
+
+Services/QueryValidator.cs
+
+A validação deve acontecer antes da execução da consulta.
+
+---
+
+# FASE 4 — Primeiras ferramentas SQL
+
+Criar as seguintes MCP Tools:
+
+## list_databases
+
+Lista os databases que o usuário da conexão consegue acessar.
+
+Retornar informações de forma estruturada e legível.
+
+---
+
+## list_tables
+
+Receber:
+
+database
+
+Retornar:
+
+* schema;
+* nome da tabela;
+* tipo.
+
+Utilizar INFORMATION_SCHEMA quando apropriado.
+
+---
+
+## describe_table
+
+Receber:
+
+database
+table
+
+Retornar:
+
+* coluna;
+* tipo;
+* tamanho;
+* nullable;
+* posição;
+* informação de chave quando disponível.
+
+Exemplo esperado:
+
+PESSOA
+
+ID_PESS       int          NOT NULL
+NM_PESS       varchar(100) NOT NULL
+DT_ADMIS      datetime     NULL
+ID_ESTRT_ORG  int          NOT NULL
+
+---
+
+# FASE 5 — Descoberta do banco
+
+Criar:
+
+## find_columns
+
+Permitir procurar uma coluna pelo nome.
+
+Exemplo:
+
+find_columns("RAIO")
+
+Deve procurar no schema do database e retornar tabelas/colunas encontradas.
+
+---
+
+## find_relationships
+
+Receber uma tabela.
+
+Retornar possíveis relacionamentos utilizando as foreign keys existentes no SQL Server.
+
+Exemplo:
+
+PESSOA.ID_ESTRT_ORG
+->
+ESTRUTURA_ORGANIZACIONAL.ID_ESTRT_ORG
+
+Caso não existam foreign keys, deixar isso explícito.
+
+Não inventar relacionamentos baseados apenas no nome.
+
+---
+
+# FASE 6 — Análise dos dados
+
+Criar:
+
+## sample_data
+
+Receber:
+
+database
+table
+limit
+
+Retornar uma amostra dos registros.
+
+Adicionar limite máximo de registros.
+
+Por exemplo:
+
+max = 100
+
+Mesmo que o Cursor solicite:
+
+limit = 100000
+
+o MCP deve limitar ao máximo configurado.
+
+Não utilizar SELECT * sem TOP/LIMIT equivalente.
+
+Para SQL Server, utilizar TOP.
+
+---
+
+## row_count
+
+Receber:
+
+database
+table
+
+Retornar a quantidade de registros.
+
+A consulta deve ser otimizada e não retornar dados desnecessários.
+
+---
+
+## get_column_stats
+
+Receber:
+
+database
+table
+column
+
+Retornar informações úteis para análise, como:
+
+* quantidade de registros;
+* quantidade de NULL;
+* quantidade de valores distintos;
+* menor valor;
+* maior valor;
+
+Quando fizer sentido para o tipo da coluna.
+
+Não tentar aplicar MIN/MAX em tipos incompatíveis.
+
+---
+
+# FASE 7 — Query genérica
+
+Criar a ferramenta:
+
+## execute_select
+
+Receber:
+
+database
+sql
+
+Permitir somente consultas de leitura.
+
+A consulta deve passar pelo QueryValidator.
+
+Adicionar:
+
+* timeout;
+* limite de linhas;
+* limite de tamanho do resultado;
+* tratamento de erros;
+* cancelamento quando possível.
+
+O MCP não deve retornar milhões de registros para o Cursor.
+
+Se a consulta retornar dados demais, truncar o resultado e informar claramente que ele foi limitado.
+
+---
+
+# FASE 8 — Segurança adicional
+
+Adicionar proteção contra consultas excessivamente pesadas.
+
+Configurar:
+
+CommandTimeout
+
+e limite máximo de registros.
+
+Também considerar impedir operações perigosas como:
+
+* consultas sem filtro em tabelas muito grandes, quando isso representar risco;
+* CROSS JOIN sem necessidade;
+* múltiplas consultas concatenadas;
+* comandos SQL Server perigosos;
+* chamadas a stored procedures.
+
+Não confiar somente no prompt da IA.
+
+A segurança deve existir no código do MCP.
+
+---
+
+# FASE 9 — Configuração do Cursor
+
+Depois que todas as ferramentas estiverem funcionando, configurar o Cursor para iniciar o MCP através do executável.
+
+O Cursor deverá conseguir acessar:
+
+test_connection
+list_databases
+list_tables
+describe_table
+find_columns
+find_relationships
+sample_data
+row_count
+get_column_stats
+execute_select
+
+Criar documentação no README explicando exatamente como configurar o MCP no Cursor.
+
+Não inventar caminhos.
+
+Usar o caminho real do executável gerado pelo projeto.
+
+---
+
+# FASE 10 — Teste completo
+
+Criar uma checklist para validar o MCP.
+
+Testar:
+
+1. Cursor consegue iniciar o MCP.
+2. test_connection funciona.
+3. list_databases funciona.
+4. list_tables funciona.
+5. describe_table funciona.
+6. find_columns funciona.
+7. find_relationships funciona.
+8. sample_data funciona.
+9. row_count funciona.
+10. get_column_stats funciona.
+11. execute_select funciona.
+12. INSERT é bloqueado.
+13. UPDATE é bloqueado.
+14. DELETE é bloqueado.
+15. DROP é bloqueado.
+16. ALTER é bloqueado.
+17. EXEC é bloqueado.
+18. consultas muito grandes são limitadas.
+19. timeout funciona.
+20. credenciais não aparecem no código ou Git.
+
+---
+
+# FASE 11 — Teste de uso real no planejamento
+
+Depois que o MCP estiver funcionando, faça um teste real simulando uma tarefa de desenvolvimento.
+
+Use um prompt semelhante a:
+
+"Antes de criar o plano dessa tarefa, analise o banco de dados.
+
+Identifique as tabelas relacionadas ao assunto, analise o schema, verifique os relacionamentos e consulte uma amostra dos dados quando necessário.
+
+Não altere nenhum dado.
+
+Depois apresente:
+
+1. tabelas envolvidas;
+2. campos relevantes;
+3. relacionamentos;
+4. comportamento observado nos dados;
+5. possíveis impactos;
+6. dúvidas ou pontos que precisam ser investigados;
+7. recomendação para o plano de implementação.
+
+Não faça alterações no banco."
+
+O resultado esperado é que o Cursor use as MCP Tools para investigar o banco antes de criar o plano.
+
+---
+
+# Organização final desejada
+
+Ao final, buscar uma estrutura semelhante a:
+
+SqlServerMcp/
+│
+├── Program.cs
+├── SqlServerMcp.csproj
+├── README.md
+│
+├── Tools/
+│   ├── DatabaseTools.cs
+│   ├── SchemaTools.cs
+│   ├── DataTools.cs
+│   └── QueryTools.cs
+│
+├── Services/
+│   ├── SqlServerService.cs
+│   └── QueryValidator.cs
+│
+├── Models/
+│   └── ...
+│
+└── Configuration/
+└── ...
+
+Não criar arquivos ou abstrações desnecessárias.
+
+Priorizar código simples, legível e fácil de manter.
+
+---
+
+# Regras importantes
+
+1. O MCP é READ-ONLY.
+2. Nunca executar INSERT.
+3. Nunca executar UPDATE.
+4. Nunca executar DELETE.
+5. Nunca executar DROP.
+6. Nunca executar ALTER.
+7. Nunca executar TRUNCATE.
+8. Nunca executar EXEC.
+9. Nunca colocar senha no código.
+10. Não alterar o banco durante os testes.
+11. Não inventar informações sobre schema.
+12. Não inventar relacionamentos.
+13. Sempre consultar o banco quando a resposta depender dos dados reais.
+14. Limitar quantidade de dados retornados.
+15. Utilizar async/await.
+16. Tratar corretamente conexões e comandos SQL.
+17. Manter logs úteis, mas nunca registrar senha ou connection string completa.
+18. Preferir consultas parametrizadas quando houver parâmetros.
+19. Não utilizar ORM; utilizar Microsoft.Data.SqlClient diretamente.
+20. Manter o MCP simples e focado em análise de SQL Server.
+
+---
+
+# Comportamento durante o desenvolvimento
+
+Quero que você atue como desenvolvedor responsável pela implementação.
+
+Não quero que você apenas explique como fazer.
+
+Quero que você crie/modifique os arquivos do projeto.
+
+Porém, implemente somente UMA FASE POR VEZ.
+
+Ao concluir uma fase, pare e apresente:
+
+### Fase concluída
+
+O que foi implementado.
+
+### Arquivos
+
+Lista dos arquivos criados/modificados.
+
+### Validação
+
+Comandos que executei para validar.
+
+### Resultado esperado
+
+O que deve acontecer.
+
+### Próxima fase
+
+Qual será a próxima fase.
+
+Depois aguarde minha confirmação.
+
+Comece agora pela **FASE 1**.

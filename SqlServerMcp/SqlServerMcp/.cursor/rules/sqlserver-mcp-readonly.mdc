@@ -1,0 +1,103 @@
+# SQL Server MCP --- Read-Only
+
+## Objetivo
+
+Este projeto deve criar um servidor MCP em C#/.NET para permitir que o
+Cursor consulte um SQL Server durante o planejamento e análise de
+tarefas de desenvolvimento.
+
+O objetivo NÃO é permitir que o Cursor altere o banco de dados.
+
+O MCP deve ser 100% read-only, permitindo apenas consultas de análise e
+exploração do banco.
+
+O Cursor deverá conseguir:
+
+-   Analisar como a tabela PESSOA é utilizada.
+-   Identificar tabelas relacionadas a EMPRESA.
+-   Encontrar onde existe uma coluna específica, como RAIO_MARCACAO.
+-   Analisar uma amostra de registros de uma tabela.
+-   Contar registros de uma tabela.
+-   Analisar valores existentes em um campo.
+-   Consultar os dados atuais antes de planejar uma alteração.
+-   Verificar se existem registros potencialmente afetados por uma
+    alteração.
+
+O objetivo é permitir que o Cursor explore o banco, compreenda seu
+schema e analise dados reais antes de elaborar um plano de
+implementação.
+
+------------------------------------------------------------------------
+
+## Arquitetura
+
+A arquitetura deve ser:
+
+Cursor \| \| MCP / STDIO v SQL Server MCP \| \| Microsoft.Data.SqlClient
+v SQL Server
+
+O MCP será executado localmente no Windows e o Cursor será responsável
+por iniciar o processo MCP.
+
+### Restrições de arquitetura
+
+-   Utilizar MCP via STDIO.
+-   Não utilizar HTTP nesta primeira versão.
+-   Não utilizar Docker nesta primeira versão.
+-   Não criar servidor remoto.
+-   O SQL Server MCP deve ser executado localmente no Windows.
+-   O Cursor deve iniciar o processo do MCP.
+
+------------------------------------------------------------------------
+
+## Tecnologias
+
+Utilizar:
+
+-   C#
+-   .NET
+-   ModelContextProtocol SDK oficial para C#
+-   Microsoft.Data.SqlClient
+-   Windows
+-   SQL Server
+-   MCP via STDIO
+
+Não introduzir frameworks ou dependências desnecessárias.
+
+------------------------------------------------------------------------
+
+## Desenvolvimento em fases
+
+A implementação deve obrigatoriamente ser realizada em fases.
+
+### Regras
+
+-   NÃO pular fases.
+-   NÃO implementar todas as fases de uma vez.
+-   Implementar somente a fase atual.
+-   Ao finalizar uma fase, parar e aguardar confirmação antes de iniciar
+    a próxima.
+
+Ao concluir cada fase, obrigatoriamente:
+
+1.  Compilar o projeto.
+2.  Executar os testes ou validações necessários.
+3.  Explicar o que foi implementado.
+4.  Listar os arquivos criados ou alterados.
+5.  Informar como validar a fase.
+6.  Informar qual será a próxima fase.
+7.  Aguardar confirmação do usuário.
+
+O agente deve respeitar rigorosamente esse fluxo.
+
+------------------------------------------------------------------------
+
+## Princípio fundamental
+
+O SQL Server MCP existe para permitir que o Cursor faça análise e
+exploração de dados durante o planejamento de desenvolvimento.
+
+O banco deve ser tratado como uma fonte de informação para análise.
+
+O MCP não deve possuir capacidade de modificar os dados ou a estrutura
+do banco.
